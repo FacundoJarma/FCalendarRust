@@ -208,7 +208,8 @@ fn parse_categories(value: &Value, data: &mut CalendarData) {
         return;
     };
     for (name, category_value) in object {
-        if name.trim().is_empty() {
+        let name = name.trim();
+        if name.is_empty() {
             continue;
         }
         let category = if let Some(color) = category_value.as_str() {
@@ -229,7 +230,7 @@ fn parse_categories(value: &Value, data: &mut CalendarData) {
         } else {
             Category::new(DEFAULT_CATEGORY_COLOR)
         };
-        data.categories.insert(name.clone(), category);
+        data.categories.insert(name.to_string(), category);
     }
 }
 
@@ -407,7 +408,8 @@ fn parse_shortcuts(value: &Value, data: &mut CalendarData) {
 fn shortcut_from_value(item: &Value, fallback_priority: f64) -> Option<(f64, Shortcut)> {
     let object = item.as_object()?;
     let name = object.get("name").and_then(Value::as_str)?;
-    if name.trim().is_empty() {
+    let name = name.trim();
+    if name.is_empty() {
         return None;
     }
     let properties = object.get("properties").and_then(Value::as_object);

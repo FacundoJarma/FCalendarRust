@@ -132,7 +132,7 @@ pub fn dot(ui: &mut Ui, color: Color32, size: f32) -> Response {
 
 pub fn chip(ui: &mut Ui, text: &str, background: Color32, foreground: Color32, remove: bool) -> Response {
     let font = FontId::proportional(11.0);
-    let galley = ui.fonts(|fonts| fonts.layout_no_wrap(text.to_owned(), font.clone(), foreground));
+    let galley = ui.ctx().fonts_mut(|fonts| fonts.layout_no_wrap(text.to_owned(), font.clone(), foreground));
     let extra = if remove { 15.0 } else { 0.0 };
     let size = vec2(galley.size().x + 18.0 + extra, 21.0);
     let sense = if remove { Sense::click() } else { Sense::hover() };
@@ -164,7 +164,7 @@ pub fn chip(ui: &mut Ui, text: &str, background: Color32, foreground: Color32, r
 
 pub fn key_hint(ui: &mut Ui, text: &str) {
     let font = FontId::monospace(10.0);
-    let galley = ui.fonts(|fonts| fonts.layout_no_wrap(text.to_owned(), font, TEXT_MUTED));
+    let galley = ui.ctx().fonts_mut(|fonts| fonts.layout_no_wrap(text.to_owned(), font, TEXT_MUTED));
     let size = galley.size() + vec2(10.0, 4.0);
     let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
     ui.painter().rect_filled(rect, 4.0, CARD);
@@ -240,7 +240,7 @@ pub fn color_swatch(ui: &mut Ui, color: Color32, size: f32, selected: bool) -> R
 
 pub fn badge(ui: &mut Ui, text: &str, color: Color32) {
     let font = FontId::proportional(10.0);
-    let galley = ui.fonts(|fonts| fonts.layout_no_wrap(text.to_owned(), font, color));
+    let galley = ui.ctx().fonts_mut(|fonts| fonts.layout_no_wrap(text.to_owned(), font, color));
     let size = galley.size() + vec2(12.0, 4.0);
     let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
     ui.painter()

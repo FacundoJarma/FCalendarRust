@@ -122,6 +122,9 @@ pub fn format_number(value: f64) -> String {
 
 pub fn parse_hex_color(value: &str) -> Option<[u8; 3]> {
     let value = value.trim().trim_start_matches('#');
+    if !value.is_ascii() {
+        return None;
+    }
     match value.len() {
         3 => {
             let r = u8::from_str_radix(&value[0..1].repeat(2), 16).ok()?;
@@ -339,14 +342,53 @@ impl CalendarData {
     /// Normaliza datos cargados o importados. Es idempotente.
     pub fn normalize(&mut self) {
         self.version = DATA_VERSION;
-        if self.profile_name.trim().is_empty() {
-            self.profile_name = "Mi calendario".to_string();
-        }
+        let profile_name = self.profile_name.trim().to_string();
+        self.profile_name = if profile_name.is_empty() {
+            "Mi calendario".to_string()
+        } else {
+            profile_name
+        };
         if self.categories.is_empty() {
             self.categories.insert(
                 DEFAULT_CATEGORY.to_string(),
                 Category::new(DEFAULT_CATEGORY_COLOR),
             );
+        } else {
+            let categories = std::mem::take(&mut self.categories);
+            for (name, category) in categories {
+                let name = name.trim();
+                if !name.is_empty() {
+                    self.categories.entry(name.to_string()).or_insert(category);
+                }
+            }
+            if self.categories.is_empty() {
+                self.categories.insert(
+                    DEFAULT_CATEGORY.to_string(),
+                    Category::new(DEFAULT_CATEGORY_COLOR),
+                );
+            }
+        }
+
+        // Campos de texto y etiquetas primero, para que las categorías se
+        // resuelvan contra los nombres ya normalizados.
+        let mut max_id = self.next_id.saturating_sub(1);
+        for event in &mut self.events {
+            event.ensure_default_properties();
+            event.title = event.title.trim().to_string();
+            if event.title.is_empty() {
+                event.title = "Sin título".to_string();
+            }
+            max_id = max_id.max(event.id);
+
+            let mut seen_tags = HashSet::new();
+            let mut tags = Vec::new();
+            for tag in &event.tags {
+                let tag = tag.trim();
+                if !tag.is_empty() && seen_tags.insert(tag.to_string()) {
+                    tags.push(tag.to_string());
+                }
+            }
+            event.tags = tags;
         }
 
         // Garantiza que cada etiqueta usada tenga una categoría visible. Así una
@@ -365,30 +407,23 @@ impl CalendarData {
         }
 
         // IDs únicos y estables.
-        let mut max_id = self.next_id.saturating_sub(1);
-        for event in &self.events {
-            max_id = max_id.max(event.id);
-        }
         let mut seen = HashSet::new();
         for event in &mut self.events {
-            event.ensure_default_properties();
             if event.id == 0 || !seen.insert(event.id) {
                 max_id += 1;
                 event.id = max_id;
                 seen.insert(event.id);
             }
-            let mut seen_tags = HashSet::new();
-            event.tags.retain(|tag| {
-                let tag = tag.trim();
-                !tag.is_empty() && seen_tags.insert(tag.to_string())
-            });
         }
         self.next_id = max_id.saturating_add(1).max(1);
 
         // Un shortcut por categoría; el primero de la lista es el de mayor prioridad.
+        for shortcut in &mut self.shortcuts {
+            shortcut.name = shortcut.name.trim().to_string();
+        }
         let mut shortcut_names = HashSet::new();
         self.shortcuts
-            .retain(|shortcut| !shortcut.name.trim().is_empty() && shortcut_names.insert(shortcut.name.clone()));
+            .retain(|shortcut| !shortcut.name.is_empty() && shortcut_names.insert(shortcut.name.clone()));
 
         self.rebuild_indexes();
     }
@@ -828,5 +863,38 @@ mod tests {
         assert_eq!(parse_hex_color("b42f2f"), Some([0xB4, 0x2F, 0x2F]));
         assert_eq!(parse_hex_color("#abc"), Some([0xAA, 0xBB, 0xCC]));
         assert_eq!(parse_hex_color("#zzzzzz"), None);
+        assert_eq!(parse_hex_color("€"), None);
+    }
+
+    #[test]
+    fn normalize_trims_titles_and_tags() {
+        let mut data = CalendarData::default();
+        let event = Event::new(
+            3,
+            "   ",
+            date(1),
+            vec![" Trabajo ".into(), "Trabajo".into(), "  ".into()],
+        );
+        data.events.push(event);
+        data.normalize();
+        assert_eq!(data.events[0].title, "Sin título");
+        assert_eq!(data.events[0].tags, vec!["Trabajo".to_string()]);
+        assert!(data.categories.contains_key("Trabajo"));
+    }
+
+    #[test]
+    fn normalize_trims_category_and_shortcut_names() {
+        let mut data = CalendarData::default();
+        data.categories.clear();
+        data.categories
+            .insert(" Trabajo ".to_string(), Category::new("#111111"));
+        data.shortcuts
+            .push(Shortcut::new(" Trabajo ", "#222222", "#FFFFFF"));
+        let id = data.add_event("X", date(1), vec![" Trabajo ".to_string()]);
+        data.normalize();
+        assert!(data.categories.contains_key("Trabajo"));
+        assert_eq!(data.categories.len(), 1);
+        assert_eq!(data.shortcuts[0].name, "Trabajo");
+        assert_eq!(data.event(id).unwrap().tags, vec!["Trabajo".to_string()]);
     }
 }

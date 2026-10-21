@@ -91,7 +91,7 @@ impl FCalendarApp {
                 cell_size,
             );
             let in_month = date.month() == self.view.month && date.year() == self.view.year;
-            let cell_id = ui.id().with(("calendar_day", *date));
+            let cell_id = ui.scope_id().with(("calendar_day", *date));
             let cell_response = ui.interact(cell_rect, cell_id, Sense::click());
             let hovered = cell_response.hovered()
                 || pointer.is_some_and(|position| cell_rect.contains(position));

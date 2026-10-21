@@ -1,27 +1,16 @@
-mod date_picker;
-mod date_utils;
-mod icons;
-mod model;
-mod persistence;
-mod theme;
-mod ui_calendar;
-mod ui_details;
-mod ui_kit;
-mod ui_modals;
-mod ui_sidebar;
-mod ui_topbar;
-
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use chrono::{Datelike, NaiveDate};
 use eframe::egui;
-use egui::{Context, Id, Ui};
+use egui::{Context, Ui};
 
 use crate::date_picker::MiniCalendarState;
 use crate::date_utils::today;
 use crate::model::{CalendarData, Event, PropertyKind};
 use crate::persistence::DataPaths;
+use crate::theme;
+use crate::{date_utils, model, persistence};
 
 const AUTOSAVE_DELAY: Duration = Duration::from_millis(420);
 const DETAILS_BREAKPOINT: f32 = 1180.0;
@@ -102,7 +91,7 @@ pub enum ModalState {
     AddEvent(AddEventState),
     AddCategory(AddCategoryState),
     AddShortcut(AddShortcutState),
-    ManageShortcuts(ManageShortcutsState),
+    ManageShortcuts,
     Settings(SettingsState),
     AddProperty(AddPropertyState),
     Confirm(ConfirmState),
@@ -134,15 +123,11 @@ pub struct AddCategoryState {
 }
 
 pub struct AddShortcutState {
+    pub original: Option<String>,
     pub category: Option<String>,
     pub background: [u8; 3],
     pub text_color: [u8; 3],
     pub error: Option<String>,
-}
-
-pub struct ManageShortcutsState {
-    pub dragging: Option<usize>,
-    pub drag_target: Option<usize>,
 }
 
 pub struct SettingsState {
@@ -289,7 +274,7 @@ impl FCalendarApp {
         if !matches!(self.modal, ModalState::None) {
             return;
         }
-        if ctx.wants_keyboard_input() || egui::Popup::is_any_open(ctx) {
+        if ctx.egui_wants_keyboard_input() || egui::Popup::is_any_open(ctx) {
             return;
         }
 
@@ -331,7 +316,7 @@ impl FCalendarApp {
         }
     }
 
-    fn apply_actions(&mut self, actions: Vec<Action>) {
+    pub(crate) fn apply_actions(&mut self, actions: Vec<Action>) {
         for action in actions {
             match action {
                 Action::PrevMonth => {
@@ -370,10 +355,7 @@ impl FCalendarApp {
                 Action::OpenAddCategory => self.open_add_category(),
                 Action::OpenAddShortcut => self.open_add_shortcut(),
                 Action::OpenManageShortcuts => {
-                    self.modal = ModalState::ManageShortcuts(ManageShortcutsState {
-                        dragging: None,
-                        drag_target: None,
-                    });
+                    self.modal = ModalState::ManageShortcuts;
                 }
                 Action::OpenSettings => {
                     self.modal = ModalState::Settings(SettingsState { notice: None });
@@ -432,7 +414,7 @@ impl FCalendarApp {
         self.modal = ModalState::AddCategory(AddCategoryState {
             name: String::new(),
             color: theme::PALETTE[1].1.to_string(),
-            custom: [0x4F, 0x6B, 0xE8],
+            custom: model::parse_hex_color(theme::PALETTE[1].1).unwrap_or([0x3B, 0x5B, 0xD9]),
             error: None,
             focus_name: true,
         });
@@ -450,6 +432,7 @@ impl FCalendarApp {
             .map(|name| self.shortcut_colors_for(name))
             .unwrap_or(([0x40, 0x40, 0x40], [0xFF, 0xFF, 0xFF]));
         self.modal = ModalState::AddShortcut(AddShortcutState {
+            original: None,
             category,
             background,
             text_color,
@@ -460,10 +443,42 @@ impl FCalendarApp {
     pub fn open_edit_shortcut(&mut self, name: &str) {
         let (background, text_color) = self.shortcut_colors_for(name);
         self.modal = ModalState::AddShortcut(AddShortcutState {
+            original: Some(name.to_string()),
             category: Some(name.to_string()),
             background,
             text_color,
             error: None,
+        });
+    }
+
+    pub fn open_add_property(&mut self, event_id: u64) {
+        self.modal = ModalState::AddProperty(AddPropertyState {
+            event_id,
+            name: String::new(),
+            kind: PropertyKind::Text,
+            text: String::new(),
+            number: 0.0,
+            checked: false,
+            color: [0x40, 0x40, 0x40],
+            error: None,
+            focus_name: true,
+        });
+    }
+
+    pub(crate) fn open_confirm(
+        &mut self,
+        title: impl Into<String>,
+        message: impl Into<String>,
+        confirm_label: impl Into<String>,
+        danger: bool,
+        action: ConfirmAction,
+    ) {
+        self.modal = ModalState::Confirm(ConfirmState {
+            title: title.into(),
+            message: message.into(),
+            confirm_label: confirm_label.into(),
+            danger,
+            action,
         });
     }
 
@@ -506,7 +521,7 @@ impl FCalendarApp {
         }
     }
 
-    fn apply_toast_action(&mut self, action: ToastAction) {
+    pub(crate) fn apply_toast_action(&mut self, action: ToastAction) {
         match action {
             ToastAction::UndoDeleteEvent(id) => {
                 if self.data.restore_event(id) {
@@ -706,17 +721,23 @@ impl eframe::App for FCalendarApp {
                 self.calendar_area(ui, &mut actions);
             });
 
+        if matches!(self.modal, ModalState::None) {
+            self.search_popup(&ctx);
+        }
+
+        let modal_before = std::mem::discriminant(&self.modal);
+        let had_actions = !actions.is_empty();
+        self.show_modals(&ctx);
         self.apply_actions(actions);
+
+        if had_actions || std::mem::discriminant(&self.modal) != modal_before {
+            ctx.request_repaint();
+        }
 
         if !wide {
             self.floating_details(&ctx);
         }
 
-        if matches!(self.modal, ModalState::None) {
-            self.search_popup(&ctx);
-        }
-
-        self.show_modals(&ctx);
         self.show_toast(&ctx);
         self.autosave(&ctx);
     }

@@ -19,9 +19,9 @@ pub const TEXT_FAINT: Color32 = Color32::from_rgb(0x74, 0x74, 0x80);
 pub const ACCENT: Color32 = Color32::from_rgb(0x4F, 0x6B, 0xE8);
 pub const ACCENT_HOVER: Color32 = Color32::from_rgb(0x64, 0x7D, 0xF0);
 pub const ACCENT_DARK: Color32 = Color32::from_rgb(0x2F, 0x4C, 0xB4);
-pub const ACCENT_SOFT: Color32 = Color32::from_rgba_unmultiplied(0x2F, 0x4C, 0xB4, 0x55);
+pub const ACCENT_SOFT: Color32 = Color32::from_rgba_unmultiplied_const(0x2F, 0x4C, 0xB4, 0x55);
 pub const DANGER: Color32 = Color32::from_rgb(0xE0, 0x5C, 0x5C);
-pub const DANGER_SOFT: Color32 = Color32::from_rgba_unmultiplied(0x7A, 0x2A, 0x2A, 0x60);
+pub const DANGER_SOFT: Color32 = Color32::from_rgba_unmultiplied_const(0x7A, 0x2A, 0x2A, 0x60);
 pub const GOLD: Color32 = Color32::from_rgb(0xE8, 0xB3, 0x4F);
 pub const GREEN: Color32 = Color32::from_rgb(0x63, 0xB5, 0x76);
 pub const TODAY: Color32 = Color32::from_rgb(0x5B, 0x7C, 0xFF);
@@ -191,6 +191,7 @@ pub fn app_icon() -> egui::IconData {
         if x < left || x > right || y < top || y > bottom {
             return false;
         }
+        let radius = radius.min((right - left).min(bottom - top) * 0.5);
         let cx = x.clamp(left + radius, right - radius);
         let cy = y.clamp(top + radius, bottom - radius);
         (x - cx).powi(2) + (y - cy).powi(2) <= radius * radius

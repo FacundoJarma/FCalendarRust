@@ -23,9 +23,9 @@ impl FCalendarApp {
             );
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 let icon = if self.view.categories_open {
-                    Icon::ChevronRight
-                } else {
                     Icon::ArrowDown
+                } else {
+                    Icon::ChevronRight
                 };
                 if icons::icon_button(
                     ui,

@@ -1,5 +1,6 @@
 //! Barra superior y buscador.
 
+use chrono::Datelike;
 use egui::{
     Align, Align2, Button, Color32, Context, FontId, Layout, Margin, Pos2, RichText, Sense, Stroke,
     TextEdit, Ui, vec2,
@@ -143,7 +144,7 @@ impl FCalendarApp {
         position.x = position.x.min((screen.right() - 390.0).max(12.0));
         position.y = position.y.min((screen.bottom() - 120.0).max(12.0));
 
-        let response = egui::Area::new(egui::Id::new("search_results"))
+        let response = egui::Area::new(egui::Id::unique("search_results"))
             .order(egui::Order::Foreground)
             .fixed_pos(position)
             .show(ctx, |ui| {
@@ -254,6 +255,7 @@ impl FCalendarApp {
             self.search.query.clear();
             self.search.popup_rect = None;
             self.apply_actions(vec![Action::SelectEvent(id)]);
+            ctx.request_repaint();
         }
     }
 }
