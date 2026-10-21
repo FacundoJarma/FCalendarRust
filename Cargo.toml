@@ -1,0 +1,37 @@
+﻿[package]
+name = "fcalendar"
+version = "0.1.0"
+edition = "2024"
+description = "Calendario personal nativo, rápido y personalizable"
+license = "MIT"
+authors = ["facujarma"]
+repository = "https://github.com/facujarma/fcalendar"
+rust-version = "1.88"
+
+[dependencies]
+eframe = { version = "0.37", default-features = false, features = [
+    "accesskit",
+    "clipboard",
+    "default_fonts",
+    "links",
+    "system_fonts",
+    "wayland",
+    "wgpu",
+    "x11",
+] }
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+directories = "6"
+indexmap = { version = "2", features = ["serde"] }
+rfd = "0.17"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.dev]
+opt-level = 1
